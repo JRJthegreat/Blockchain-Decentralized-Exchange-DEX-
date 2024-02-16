@@ -7,7 +7,7 @@ const tokens = (n)=>{
 
 describe('Token',()=> {
 	//declare the variable that will contain the the delopyed version of the token first so both of te iterations will be able to read it 
-	let token, accounts ,deployer
+	let token, accounts ,deployer , receiver
 	
 	//some javascript to set some variables upfrot if running multiple tests
 	beforeEach(async()=>{
@@ -17,6 +17,7 @@ describe('Token',()=> {
 
 		accounts = await ethers.getSigners()
 		deployer = accounts[0]
+		receiver = accounts[1]
 
 	})
 
@@ -58,5 +59,52 @@ describe('Token',()=> {
 		})
 	})
 
-	
+	describe('sending tokens',()=>{
+
+		describe('success',()=>{
+			let amount,  trasnaction, result
+		beforeEach(async()=>{
+			amount = tokens(100)
+			transaction = await token.connect(deployer).transfer(receiver.address,amount)
+			result      = await transaction.wait()
+
+		})
+
+		it('transfers Token balances',async ()=>{
+			expect(await token.balanceOf(deployer.address)).to.equal(tokens(999900))
+			expect(await token.balanceOf(receiver.address)).to.equal(amount)
+		})
+
+		it('emits the Transfer event',async()=>{
+			const event = await result.events[0]
+			expect(await event.event).to.equal('Transfer')
+
+			const args = await event.args
+			expect(await args.from).to.equal(deployer.address)
+			expect(await args.to).to.equal(receiver.address)
+			expect(await args.value).to.equal(amount)
+
+		})
+
+		describe('failure',()=>{
+			it('rejects insufficent balances',async()=>{
+				let invalidAmout = tokens(1000000000)
+				await expect(token.connect(deployer).transfer(receiver.address,invalidAmout)).to.be.reverted 
+
+			})
+
+			it('rejects invalind recipients',async()=>{
+				const amount = tokens(100)
+				await expect(token.connect(deployer).transfer('0x0000000000000000000000000000000000000000', amount)).to.be.reverted
+
+
+			})
+			
+		})
+
+
+		})
+		
+
+	})
 })
