@@ -7,7 +7,7 @@ const tokens = (n)=>{
 
 describe('Token',()=> {
 	//declare the variable that will contain the the delopyed version of the token first so both of te iterations will be able to read it 
-	let token, accounts ,deployer , receiver
+	let token, accounts ,deployer , receiver,exchange
 	
 	//some javascript to set some variables upfrot if running multiple tests
 	beforeEach(async()=>{
@@ -18,6 +18,8 @@ describe('Token',()=> {
 		accounts = await ethers.getSigners()
 		deployer = accounts[0]
 		receiver = accounts[1]
+		exchange = accounts[2]
+
 
 	})
 
@@ -62,7 +64,7 @@ describe('Token',()=> {
 	describe('sending tokens',()=>{
 
 		describe('success',()=>{
-			let amount,  trasnaction, result
+			let amount,  transaction, result
 		beforeEach(async()=>{
 			amount = tokens(100)
 			transaction = await token.connect(deployer).transfer(receiver.address,amount)
@@ -106,5 +108,38 @@ describe('Token',()=> {
 		})
 		
 
+	})
+	describe ('Approving tokens',()=>{
+		let amount,  transaction, result
+
+		beforeEach(async()=>{
+			amount = tokens(100)
+			transaction = await token.connect(deployer).approve(exchange.address,amount)
+			result      = await transaction.wait()
+
+		})
+
+		describe('success',()=>{
+			it('allocates and allowance for delegated token spending',async()=>{
+				expect(await token.allowance(deployer.address,exchange.address)).to.equal(amount)
+			})
+			it('emits an approval event',async()=>{
+				const event = await result.events[0]
+				expect(await event.event).to.equal('Approval')
+
+				const args = await event.args
+				expect(await args.owner).to.equal(deployer.address)
+				expect(await args.spender).to.equal(exchange.address)
+				expect(await args.value).to.equal(amount)
+			})
+
+		})
+		describe('failure',()=>{
+				it('rejects invalind spenders',async()=>{
+				const amount = tokens(100)
+				await expect(token.connect(deployer).transfer('0x0000000000000000000000000000000000000000', amount)).to.be.reverted 
+				})
+
+		})
 	})
 })
