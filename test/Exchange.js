@@ -15,6 +15,7 @@ describe('Exchange',()=> {
 		const Exchange= await ethers.getContractFactory('Exchange')
 		const Token= await ethers.getContractFactory('Token')
 		token1= await Token.deploy('Haitian Gourde','HTG','1000000')
+		token2= await Token.deploy('Mock DogeCoin','mDOGE','1000000')
 
 		accounts = await ethers.getSigners()
 		deployer = accounts[0]
@@ -97,6 +98,146 @@ describe('Exchange',()=> {
 
 
 	})
+
+
+	describe('withdraw  tokens',()=>{ 
+		let transaction, result
+		let amount = tokens(10)
+
+		
+		describe('success',()=>{
+				beforeEach(async()=>{
+				
+				
+				//Approve token
+					transaction = await token1.connect(user1).approve(exchange.address, amount)
+					result = await transaction.wait()
+
+				//deposit token
+					transaction = await exchange.connect(user1).depositToken(token1.address, amount)
+					result = await transaction.wait()
+				//now withdraw tokens
+					transaction = await exchange.connect(user1).withdrawToken(token1.address, amount)
+					result = await transaction.wait()
+
+				})
+
+				it('withdraws the token funds', async()=>{
+					expect(await token1.balanceOf(exchange.address)).to.equal(0)
+					expect(await exchange.tokens(token1.address, user1.address)).to.equal(0)
+					expect(await exchange.balanceOf(token1.address, user1.address)).to.equal(0)
+
+
+				})
+
+				it('emits a withdrawal event',async()=>{
+					const event = await result.events[1]
+					expect(await event.event).to.equal('Withdraw')
+					
+					const args = await event.args
+					expect(await args.token).to.equal(token1.address)
+					expect(await args.user).to.equal(user1.address)
+					expect(await args.amount).to.equal(amount)
+					expect(await args.balance).to.equal(0)
+
+				})
+
+		})
+
+		describe('failure',()=>{
+				it('it fails for insufficient balance ',async()=>{
+					//Attempts to withdraw without depositing
+					await expect( exchange.connect(user1).withdrawToken(token1.address, amount)).to.be.reverted
+				})
+
+		})
+	})
+
+	describe('checking user balances',()=>{ 
+		let transaction, result
+		let amount = tokens(1)
+
+		beforeEach(async()=>{
+			
+			
+			//Approve token
+			transaction = await token1.connect(user1).approve(exchange.address, amount)
+			result = await transaction.wait()
+
+			//deposit token
+			transaction = await exchange.connect(user1).depositToken(token1.address, amount)
+			result = await transaction.wait()
+
+			})
+
+			it('it returns the user balance', async()=>{
+				expect(await exchange.balanceOf(token1.address, user1.address)).to.equal(amount)
+			})
+
+			
+	})
+
+
+	describe('making orders',()=>{ 
+		let transaction, result
+		let amount = tokens(10)		
+		
+		describe('success',()=>{
+				beforeEach(async()=>{
+
+					//----Deposit token before making order------//
+
+					//Approve token
+					transaction = await token1.connect(user1).approve(exchange.address, amount)
+					result = await transaction.wait()
+
+					//deposit token
+					transaction = await exchange.connect(user1).depositToken(token1.address, amount)
+					result = await transaction.wait()
+					//Make order
+					transaction = await exchange.connect(user1).makeOrder(token2.address,tokens(1),token1.address,tokens(1))
+					result = await transaction.wait()
+				
+				})
+
+				it('tracks the newly created orders', async()=>{
+					expect(await exchange.ordersCount()).to.equal(1)	
+				})
+
+				it('emits an order event',async()=>{
+					const event = await result.events[0]
+					expect(await event.event).to.equal('Order')
+					
+					const args = await event.args
+					expect(await args.id).to.equal(1)
+					expect(await args.user).to.equal(user1.address)
+					expect(await args.tokenGet).to.equal(token2.address)
+					expect(await args.amountGet).to.equal(tokens(1))
+					expect(await args.tokenGive).to.equal(token1.address)
+					expect(await args.amountGive).to.equal(tokens(1))
+					expect(await args.timestamp).to.at.least(1)
+					
+
+
+
+				})
+
+
+		})
+
+		describe('failure',()=>{
+			it('rejects with no balance', async () =>{
+				await expect( exchange.connect(user1).makeOrder(token2.address,tokens(1),token1.address,tokens(1))).to.be.reverted
+
+			})
+				
+
+		})
+	})
+
+
+
+
 })
 
 	
