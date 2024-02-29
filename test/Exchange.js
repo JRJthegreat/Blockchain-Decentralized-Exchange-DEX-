@@ -7,7 +7,7 @@ const tokens = (n)=>{
 
 describe('Exchange',()=> {
 	//declare the variable that will contain the the delopyed version of the token first so both of te iterations will be able to read it 
-	let deployer , feeAccount, accounts, exchange, user1
+	let deployer , feeAccount, accounts, exchange, user1, user2
 	const feePercent = 10
 	
 	//some javascript to set some variables upfrot if running multiple tests
@@ -21,6 +21,7 @@ describe('Exchange',()=> {
 		deployer = accounts[0]
 		feeAccount = accounts[1]
 		user1 = accounts[2]
+		user2 = accounts[3]
 
 		let transaction = await token1.connect(deployer).transfer(user1.address, tokens(100))
 		await transaction.wait()
@@ -235,8 +236,90 @@ describe('Exchange',()=> {
 		})
 	})
 
+	describe('order actions ',()=>{	
+		let transaction , result
+		let amount = tokens(100)
+		beforeEach(async()=>{
+
+			//----Deposit token before making order------//
+
+			//Approve token
+			transaction = await token1.connect(user1).approve(exchange.address, amount)
+			result = await transaction.wait()
+
+			//deposit token
+			transaction = await exchange.connect(user1).depositToken(token1.address, amount)
+			result = await transaction.wait()
+			//Make order
+			transaction = await exchange.connect(user1).makeOrder(token2.address,tokens(1),token1.address,tokens(1))
+			result = await transaction.wait()
+		})
 
 
+		describe('cancelling orders',()=>{
+
+			describe('success',()=>{
+				beforeEach(async()=>{
+					transaction = await exchange.connect(user1).cancelOrder(1)
+					result = await transaction.wait()
+				})
+				it('updates cancelled orders',async()=>{
+					expect(await exchange.orderCancelled(1)).to.equal(true)
+				})
+
+				it('emits a cancellation event',async()=>{
+					const event = await result.events[0]
+					expect(await event.event).to.equal('Cancel')
+					
+					const args = await event.args
+					expect(await args.id).to.equal(1)
+					expect(await args.user).to.equal(user1.address)
+					expect(await args.tokenGet).to.equal(token2.address)
+					expect(await args.amountGet).to.equal(tokens(1))
+					expect(await args.tokenGive).to.equal(token1.address)
+					expect(await args.amountGive).to.equal(tokens(1))
+					expect(await args.timestamp).to.at.least(1)
+					
+
+
+
+				})
+
+			
+			})
+
+			describe('failure',()=>{
+
+				it('rejects invalid order ids', async()=>{
+
+			//----Deposit token before making order------//
+
+			// //Approve token
+			// 		transaction = await token1.connect(user1).approve(exchange.address, amount)
+			// 		result = await transaction.wait()
+
+			// //deposit token
+			// 		transaction = await exchange.connect(user1).depositToken(token1.address, amount)
+			// 		result = await transaction.wait()
+			// //Make order
+			// 		transaction = await exchange.connect(user1).makeOrder(token2.address,tokens(1),token1.address,tokens(1))
+			// 		result = await transaction.wait()
+
+					const InvalidOrderId = 99
+					await expect(exchange.connect(user1).cancelOrder(InvalidOrderId)).to.be.reverted
+
+				})
+
+				it('rejects unauthorize cancellation ',async()=>{
+					await expect(exchange.connect(user2).cancelOrder(1)).to.be.reverted
+				})
+
+			
+			})
+		})
+
+		
+	})
 
 })
 
