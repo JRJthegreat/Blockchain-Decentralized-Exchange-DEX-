@@ -46,7 +46,7 @@ contract Token {
 
 	{
 		//Require that the sender has enough token to transfer
-		require (balanceOf[msg.sender] >= _value);
+		require (balanceOf[msg.sender] >= _value,'sender should have enough money to transfer');
 		_transfer(msg.sender,_to, _value);
 
 
